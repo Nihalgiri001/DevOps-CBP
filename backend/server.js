@@ -50,7 +50,14 @@ const app = express();
 // --- Middleware chain (order is significant) --------------------------------
 
 // 1. CORS – allow cross-origin requests from the frontend
-app.use(cors());
+//    In production, restrict this to your actual frontend domain.
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 // 2. JSON body parser – parse incoming JSON payloads
 app.use(express.json());

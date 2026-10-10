@@ -17,6 +17,11 @@ COPY package.json package-lock.json ./
 # Install all dependencies (including devDependencies needed by react-scripts)
 RUN npm install --legacy-peer-deps
 
+# Declare build-time variable so react-scripts can embed the API URL
+# This must come AFTER npm install to avoid cache busting on every URL change
+ARG REACT_APP_API_URL=http://localhost:5001/api
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copy the rest of the source code
 COPY . .
 

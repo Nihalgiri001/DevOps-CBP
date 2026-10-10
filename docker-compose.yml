@@ -20,8 +20,7 @@ services:
     container_name: communitylink-mongodb
     restart: unless-stopped
     ports:
-      # Expose MongoDB to the host for local development / inspection tools
-      - "27017:27017"
+      - "27018:27017"
     environment:
       # Optional: enable authentication by setting these variables.
       # Leave blank for a no-auth local development setup.
