@@ -219,12 +219,27 @@ jobs:
       # ── Configure kubectl from the KUBE_CONFIG secret ─────
       # KUBE_CONFIG must contain a base64-encoded kubeconfig file.
       # In GitHub: Settings → Secrets → Actions → New repository secret
+      # - name: Configure kubectl
+      #   run: |
+      #     mkdir -p $HOME/.kube
+      #     echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+      #     chmod 600 $HOME/.kube/config
+      # 1
+      # - name: Configure kubectl
+      #   run: |
+      #     mkdir -p $HOME/.kube
+      #     echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config 2>/dev/null || \
+      #     echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+      #     chmod 600 $HOME/.kube/config
+
       - name: Configure kubectl
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config 2>/dev/null || \
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
-
+          kubectl cluster-info
+          
       # ── Apply manifests in dependency order ───────────────
       # Order matters: namespace → config → storage → workloads
       - name: Apply Kubernetes manifests
