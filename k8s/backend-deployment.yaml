@@ -1,0 +1,111 @@
+# ============================================================
+# CommunityLink – Backend Deployment + ClusterIP Service
+# Requirements: 8.1, 8.2, 8.5, 8.7, 8.10, 8.11
+#
+# Deployment:
+#   - 2 replicas for availability
+#   - Env vars sourced from ConfigMap and Secret
+#   - Readiness probe: HTTP GET /health (initialDelay 10s)
+#   - Liveness probe:  HTTP GET /health (initialDelay 30s)
+#   - Container port: 5000
+#
+# Service:
+#   - ClusterIP on port 5000 (internal – frontend and probes only)
+# ============================================================
+
+# ── Deployment ───────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: communitylink
+  labels:
+    app: communitylink
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: communitylink
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: communitylink
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          image: communitylink-backend:latest
+          # Change to your Docker Hub image, e.g.:
+          # image: <dockerhub-username>/communitylink-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            # Non-sensitive config from ConfigMap
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: communitylink-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: communitylink-config
+                  key: PORT
+            - name: MONGODB_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: communitylink-config
+                  key: MONGODB_URI
+            # Sensitive config from Secret
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: communitylink-secret
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+---
+# ── Service (ClusterIP – internal only) ──────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: communitylink
+  labels:
+    app: communitylink
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: communitylink
+    component: backend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 5000
+      targetPort: 5000

@@ -1,0 +1,15 @@
+# ============================================================
+# CommunityLink – Kubernetes Namespace
+# Requirements: 8.1
+#
+# All CommunityLink resources are isolated in the
+# 'communitylink' namespace to avoid collisions with other
+# workloads in the same cluster.
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: communitylink
+  labels:
+    app: communitylink
+    managed-by: kubectl

@@ -1,0 +1,25 @@
+# ============================================================
+# CommunityLink – ConfigMap (non-sensitive configuration)
+# Requirements: 8.1, 8.5
+#
+# Stores environment-specific configuration that is NOT secret.
+# Sensitive values (JWT_SECRET, credentials) live in secret.yaml.
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: communitylink-config
+  namespace: communitylink
+  labels:
+    app: communitylink
+data:
+  # Server
+  NODE_ENV: "production"
+  PORT: "5000"
+
+  # Database – uses the Kubernetes Service DNS name for MongoDB
+  MONGODB_URI: "mongodb://mongodb-service:27017/communitylink"
+
+  # Frontend API URL – points to the backend ClusterIP Service
+  # Update this to your actual cluster hostname / LoadBalancer IP in production
+  REACT_APP_API_URL: "http://backend-service:5000/api"

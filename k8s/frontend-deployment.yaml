@@ -1,0 +1,99 @@
+# ============================================================
+# CommunityLink – Frontend Deployment + LoadBalancer Service
+# Requirements: 8.1, 8.3, 8.6, 8.10, 8.11
+#
+# Deployment:
+#   - 2 replicas for availability
+#   - REACT_APP_API_URL sourced from ConfigMap
+#   - Readiness probe: HTTP GET / (initialDelay 5s)
+#   - Liveness probe:  HTTP GET / (initialDelay 15s)
+#   - Container port: 3000 (Nginx)
+#
+# Service:
+#   - LoadBalancer on port 80 → targetPort 3000
+#   - Exposes the frontend externally via cloud load balancer
+#     (or NodePort 30080 on bare-metal / Minikube)
+# ============================================================
+
+# ── Deployment ───────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: communitylink
+  labels:
+    app: communitylink
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: communitylink
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: communitylink
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: communitylink-frontend:latest
+          # Change to your Docker Hub image, e.g.:
+          # image: <dockerhub-username>/communitylink-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            # REACT_APP_* vars are baked in at build time by react-scripts.
+            # This entry is kept for documentation and runtime reference.
+            - name: REACT_APP_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: communitylink-config
+                  key: REACT_APP_API_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+---
+# ── Service (LoadBalancer – externally accessible) ────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: communitylink
+  labels:
+    app: communitylink
+    component: frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: communitylink
+    component: frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80          # External port (standard HTTP)
+      targetPort: 3000  # Container port (Nginx)
+      # nodePort: 30080 # Uncomment for Minikube / bare-metal NodePort access

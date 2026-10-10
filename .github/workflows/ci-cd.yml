@@ -1,0 +1,272 @@
+# ============================================================
+# CommunityLink – CI/CD Pipeline
+# Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 8.9
+#
+# Pipeline stages:
+#   1. test-backend    – Run Jest tests against a real MongoDB service
+#   2. build-frontend  – Compile React production bundle
+#   3. docker-build    – Build & push images to Docker Hub (main only)
+#   4. deploy-k8s      – Apply manifests and verify rollout (main only)
+# ============================================================
+
+name: CommunityLink CI/CD
+
+# ── Triggers (Requirements: 9.1, 9.2) ──────────────────────
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+# Prevent redundant runs for the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Shared environment ──────────────────────────────────────
+env:
+  NODE_VERSION: "18"
+  BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/communitylink-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/communitylink-frontend
+
+# ============================================================
+# JOB 1 – Backend Tests (Requirements: 9.3, 9.4, 9.5, 9.8, 9.9)
+# ============================================================
+jobs:
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    # Spin up a real MongoDB instance for integration tests
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        # Wait until MongoDB is ready before starting the job steps
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # ── Checkout (Requirement: 9.3) ──────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js setup (Requirement: 9.4) ─────────────────
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # ── Install dependencies (Requirement: 9.4) ──────────
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      # ── Run tests (Requirements: 9.5, 9.8, 9.9) ─────────
+      # TEST_MONGODB_URI points to the service container above.
+      # NODE_ENV=test keeps the app from connecting to a prod DB.
+      - name: Run backend tests with coverage
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          TEST_MONGODB_URI: mongodb://localhost:27017/communitylink_test
+          MONGODB_URI: mongodb://localhost:27017/communitylink_test
+          JWT_SECRET: ci-test-secret-do-not-use-in-production
+          PORT: 5000
+        run: npm test -- --coverage --forceExit --detectOpenHandles
+
+      # ── Upload coverage (optional) ────────────────────────
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          retention-days: 7
+
+  # ============================================================
+  # JOB 2 – Frontend Build (Requirements: 9.3, 9.4, 9.6, 9.9)
+  # ============================================================
+  build-frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout (Requirement: 9.3) ──────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js setup (Requirement: 9.4) ─────────────────
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ── Install dependencies (Requirement: 9.4) ──────────
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      # ── Build production bundle (Requirement: 9.6) ───────
+      # CI=false prevents react-scripts from treating warnings as errors,
+      # which can cause spurious build failures in CI environments.
+      - name: Build frontend production bundle
+        working-directory: frontend
+        env:
+          CI: "false"
+          REACT_APP_API_URL: http://localhost:5000/api
+        run: npm run build
+
+      # ── Upload build artifact (Requirement: 9.9) ─────────
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 7
+
+  # ============================================================
+  # JOB 3 – Docker Build & Push (main branch only)
+  # Requirements: 9.7, 9.8
+  # ============================================================
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    # Only run on pushes to main; skip for PRs and the develop branch
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Both CI jobs must succeed before images are built (Requirement: 9.8)
+    needs:
+      - test-backend
+      - build-frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Docker Buildx (multi-platform capable) ────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Authenticate with Docker Hub (Requirement: 9.7) ──
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # ── Derive a clean image tag from the Git SHA ─────────
+      - name: Derive image tag
+        id: meta
+        run: echo "sha_tag=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      # ── Build & push backend image ────────────────────────
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          # Tag with short SHA for traceability + 'latest' for convenience
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Build & push frontend image ───────────────────────
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================
+  # JOB 4 – Kubernetes Deployment (main branch only)
+  # Requirements: 8.9, 9.10
+  # ============================================================
+  deploy-k8s:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    # Only run on pushes to main
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Docker images must be pushed before we deploy
+    needs:
+      - docker-build
+    # This environment gate allows manual approval in GitHub UI (optional)
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Configure kubectl from the KUBE_CONFIG secret ─────
+      # KUBE_CONFIG must contain a base64-encoded kubeconfig file.
+      # In GitHub: Settings → Secrets → Actions → New repository secret
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      # ── Apply manifests in dependency order ───────────────
+      # Order matters: namespace → config → storage → workloads
+      - name: Apply Kubernetes manifests
+        run: |
+          echo "→ Applying namespace..."
+          kubectl apply -f k8s/namespace.yaml
+
+          echo "→ Applying ConfigMap and Secret..."
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secret.yaml
+
+          echo "→ Applying PersistentVolumeClaim..."
+          kubectl apply -f k8s/pvc.yaml
+
+          echo "→ Applying MongoDB deployment..."
+          kubectl apply -f k8s/mongodb-deployment.yaml
+
+          echo "→ Applying backend deployment..."
+          kubectl apply -f k8s/backend-deployment.yaml
+
+          echo "→ Applying frontend deployment..."
+          kubectl apply -f k8s/frontend-deployment.yaml
+
+          echo "✓ All manifests applied."
+
+      # ── Wait for rollouts to complete ─────────────────────
+      - name: Verify deployment rollouts
+        run: |
+          echo "→ Waiting for mongodb rollout..."
+          kubectl rollout status deployment/mongodb-deployment -n communitylink --timeout=120s
+
+          echo "→ Waiting for backend rollout..."
+          kubectl rollout status deployment/backend-deployment -n communitylink --timeout=120s
+
+          echo "→ Waiting for frontend rollout..."
+          kubectl rollout status deployment/frontend-deployment -n communitylink --timeout=120s
+
+          echo "✓ All deployments rolled out successfully."
+
+      # ── Display current pod status ────────────────────────
+      - name: Display pod status
+        if: always()
+        run: |
+          echo "── Pod status ─────────────────────────────────"
+          kubectl get pods -n communitylink -o wide
+          echo "── Services ────────────────────────────────────"
+          kubectl get services -n communitylink

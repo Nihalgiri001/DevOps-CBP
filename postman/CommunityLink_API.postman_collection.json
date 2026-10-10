@@ -1,0 +1,409 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "CommunityLink API",
+    "description": "Complete API collection for CommunityLink community management platform. Covers authentication, announcements, events, and health endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "announcementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "id": "f1a2b3c4-d5e6-7890-abcd-111111111111",
+      "item": [
+        {
+          "name": "Register User",
+          "id": "a1a2b3c4-d5e6-7890-abcd-222222222222",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new user account. Assigns the Resident role by default."
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "id": "b1a2b3c4-d5e6-7890-abcd-333333333333",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.data.token);",
+                  "    console.log(\"Token saved:\", jsonData.data.token);",
+                  "}",
+                  "pm.test(\"Login successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Token received\", function () {",
+                  "    pm.expect(jsonData.data).to.have.property('token');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with credentials. On success, automatically saves the JWT token to the 'token' collection variable for use in authenticated requests."
+          },
+          "response": []
+        }
+      ],
+      "description": "User registration and authentication endpoints."
+    },
+    {
+      "name": "Announcements",
+      "id": "c1a2b3c4-d5e6-7890-abcd-444444444444",
+      "item": [
+        {
+          "name": "Create Announcement",
+          "id": "d1a2b3c4-d5e6-7890-abcd-555555555555",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data._id) {",
+                  "    pm.collectionVariables.set(\"announcementId\", jsonData.data._id);",
+                  "    console.log(\"Announcement ID saved:\", jsonData.data._id);",
+                  "}",
+                  "pm.test(\"Announcement created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Announcement\",\n  \"content\": \"This is a test announcement content.\",\n  \"author\": \"Admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements"]
+            },
+            "description": "Create a new announcement. Requires Administrator role. Automatically saves the created announcement ID to the 'announcementId' collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Announcements",
+          "id": "e1a2b3c4-d5e6-7890-abcd-666666666666",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements"]
+            },
+            "description": "Retrieve all announcements ordered by creation date (newest first). Public endpoint, no authentication required."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Announcement",
+          "id": "f1a2b3c4-d5e6-7890-abcd-777777777777",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements/{{announcementId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements", "{{announcementId}}"]
+            },
+            "description": "Retrieve a single announcement by ID. Uses the 'announcementId' collection variable. Public endpoint, no authentication required."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Announcement",
+          "id": "g1a2b3c4-d5e6-7890-abcd-888888888888",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Announcement Title\",\n  \"content\": \"Updated content.\",\n  \"author\": \"Admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements/{{announcementId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements", "{{announcementId}}"]
+            },
+            "description": "Update an existing announcement by ID. Requires Administrator role and a valid token."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Announcement",
+          "id": "h1a2b3c4-d5e6-7890-abcd-999999999999",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements/{{announcementId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements", "{{announcementId}}"]
+            },
+            "description": "Delete an announcement by ID. Requires Administrator role and a valid token."
+          },
+          "response": []
+        }
+      ],
+      "description": "CRUD operations for community announcements. Create, update, and delete require Administrator role."
+    },
+    {
+      "name": "Events",
+      "id": "i1a2b3c4-d5e6-7890-abcd-aaaaaaaaaaaa",
+      "item": [
+        {
+          "name": "Create Event",
+          "id": "j1a2b3c4-d5e6-7890-abcd-bbbbbbbbbbbb",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data._id) {",
+                  "    pm.collectionVariables.set(\"eventId\", jsonData.data._id);",
+                  "    console.log(\"Event ID saved:\", jsonData.data._id);",
+                  "}",
+                  "pm.test(\"Event created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Community BBQ\",\n  \"description\": \"Annual summer BBQ event.\",\n  \"date\": \"2026-12-15\",\n  \"time\": \"18:00\",\n  \"location\": \"Community Garden\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events"]
+            },
+            "description": "Create a new community event. Requires Administrator role. Automatically saves the created event ID to the 'eventId' collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Events",
+          "id": "k1a2b3c4-d5e6-7890-abcd-cccccccccccc",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events"]
+            },
+            "description": "Retrieve all events ordered by date ascending. Public endpoint, no authentication required."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Event",
+          "id": "l1a2b3c4-d5e6-7890-abcd-dddddddddddd",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}"]
+            },
+            "description": "Retrieve a single event by ID. Uses the 'eventId' collection variable. Public endpoint, no authentication required."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Event",
+          "id": "m1a2b3c4-d5e6-7890-abcd-eeeeeeeeeeee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Community BBQ\",\n  \"description\": \"Updated description.\",\n  \"date\": \"2026-12-15\",\n  \"time\": \"19:00\",\n  \"location\": \"Updated Location\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}"]
+            },
+            "description": "Update an existing event by ID. Requires Administrator role and a valid token."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Event",
+          "id": "n1a2b3c4-d5e6-7890-abcd-ffffffffffff",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}"]
+            },
+            "description": "Delete an event by ID. Requires Administrator role and a valid token."
+          },
+          "response": []
+        }
+      ],
+      "description": "CRUD operations for community events. Create, update, and delete require Administrator role."
+    },
+    {
+      "name": "Health",
+      "id": "o1a2b3c4-d5e6-7890-abcd-101010101010",
+      "item": [
+        {
+          "name": "Get Health Status",
+          "id": "p1a2b3c4-d5e6-7890-abcd-121212121212",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Health check returns 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Status is healthy\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"healthy\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Check the health status of the API. Returns system status, uptime, database connection status, and environment. Public endpoint."
+          },
+          "response": []
+        }
+      ],
+      "description": "Health monitoring endpoint for verifying API and database connectivity."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# Exclude files that should not be copied into the backend Docker image
+
+node_modules
+npm-debug.log*
+coverage
+.env
+.env.*
+!.env.example
+tests
+*.test.js

@@ -1,0 +1,95 @@
+# ============================================================
+# CommunityLink – Docker Compose Configuration
+# Requirements: 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9
+#
+# Services:
+#   mongodb  – data tier  (port 27017)
+#   backend  – API tier   (port 5000)
+#   frontend – UI tier    (port 3000)
+#
+# All services share the 'communitylink-network' bridge network
+# so they can reach each other by service name.
+# MongoDB data is persisted in the 'mongodb-data' named volume.
+# ============================================================
+
+services:
+
+  # ── MongoDB ─────────────────────────────────────────────────
+  mongodb:
+    image: mongo:6.0
+    container_name: communitylink-mongodb
+    restart: unless-stopped
+    ports:
+      # Expose MongoDB to the host for local development / inspection tools
+      - "27017:27017"
+    environment:
+      # Optional: enable authentication by setting these variables.
+      # Leave blank for a no-auth local development setup.
+      MONGO_INITDB_DATABASE: communitylink
+    volumes:
+      # Named volume for durable data persistence across container restarts
+      - mongodb-data:/data/db
+    networks:
+      - communitylink-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Backend API ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: communitylink-backend
+    restart: unless-stopped
+    ports:
+      # Expose API to the host so tools like Postman can reach it directly
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # Use the 'mongodb' service name as the hostname (Docker DNS resolution)
+      MONGODB_URI: mongodb://mongodb:27017/communitylink
+      # Override this with a strong secret in production
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - communitylink-network
+
+  # ── Frontend (React + Nginx) ─────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Inject the API URL at build time so react-scripts can embed it
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
+    container_name: communitylink-frontend
+    restart: unless-stopped
+    ports:
+      # Expose the Nginx server to the host on port 3000
+      - "3000:3000"
+    environment:
+      # REACT_APP_* vars are baked in at build time by react-scripts,
+      # but keep it here for documentation clarity.
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
+    depends_on:
+      - backend
+    networks:
+      - communitylink-network
+
+# ── Volumes ──────────────────────────────────────────────────
+volumes:
+  mongodb-data:
+    name: communitylink-mongodb-data
+
+# ── Networks ─────────────────────────────────────────────────
+networks:
+  communitylink-network:
+    name: communitylink-network
+    driver: bridge

@@ -1,0 +1,25 @@
+# ============================================================
+# CommunityLink – PersistentVolumeClaim for MongoDB
+# Requirements: 8.1, 8.4
+#
+# Requests 5Gi of persistent storage for the MongoDB data
+# directory (/data/db).  Uses the cluster's default
+# StorageClass; adjust 'storageClassName' if needed.
+# ============================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: communitylink
+  labels:
+    app: communitylink
+    component: mongodb
+spec:
+  accessModes:
+    - ReadWriteOnce        # Single node read-write (standard for databases)
+  resources:
+    requests:
+      storage: 5Gi
+  # Remove or change storageClassName to target a specific storage class.
+  # Leaving it commented out uses the cluster default.
+  # storageClassName: standard
