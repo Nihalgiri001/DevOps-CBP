@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: communitylink-backend:latest
+          image: nihalgiri001/communitylink-backend:latest
           # Change to your Docker Hub image, e.g.:
           # image: <dockerhub-username>/communitylink-backend:latest
           imagePullPolicy: IfNotPresent

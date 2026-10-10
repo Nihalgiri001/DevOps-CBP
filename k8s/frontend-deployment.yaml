@@ -38,7 +38,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: communitylink-frontend:latest
+          image: nihalgiri001/communitylink-frontend:latest
           # Change to your Docker Hub image, e.g.:
           # image: <dockerhub-username>/communitylink-frontend:latest
           imagePullPolicy: IfNotPresent
