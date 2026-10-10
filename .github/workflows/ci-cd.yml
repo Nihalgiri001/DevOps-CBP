@@ -235,7 +235,8 @@ jobs:
       - name: Configure kubectl
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config 2>/dev/null || \
+          # Write the secret directly — store it as plain YAML in GitHub Secrets,
+          # not base64-encoded (the common source of this parse error).
           echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
           kubectl cluster-info
