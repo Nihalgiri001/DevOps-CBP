@@ -203,7 +203,7 @@ jobs:
   # ============================================================
   deploy-k8s:
     name: Deploy to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # Only run on pushes to main
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     # Docker images must be pushed before we deploy
@@ -235,7 +235,7 @@ jobs:
       - name: Configure kubectl
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
           # Verify connectivity – skip gracefully if cluster is unreachable
           kubectl cluster-info || echo "⚠️  Cluster unreachable – skipping deployment verification"
@@ -295,6 +295,10 @@ jobs:
       - name: Display pod status
         if: always()
         run: |
+          if ! kubectl cluster-info > /dev/null 2>&1; then
+            echo "⚠️  No reachable cluster – skipping pod status display."
+            exit 0
+          fi
           echo "── Pod status ─────────────────────────────────"
           kubectl get pods -n communitylink -o wide
           echo "── Services ────────────────────────────────────"
