@@ -22,7 +22,7 @@ const jwt = require('jsonwebtoken');
 const TEST_DB_URI =
   process.env.MONGODB_TEST_URI ||
   process.env.MONGODB_URI ||
-  'mongodb://localhost:27017/communitylink_test';
+  'mongodb://localhost:27018/communitylink_test';
 
 // JWT secret used for signing test tokens – must match what the app uses.
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-communitylink';

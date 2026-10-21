@@ -3,7 +3,7 @@ const User = require('../models/User');
 
 describe('User Model Tests', () => {
   beforeAll(async () => {
-    const testDbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/communitylink_test';
+    const testDbUri = process.env.MONGODB_URI || 'mongodb://localhost:27018/communitylink_test';
     await mongoose.connect(testDbUri);
   });
 
